@@ -48,6 +48,12 @@ const Navbar = () => {
         </div>
 
         <div className="hidden md:flex items-center gap-3">
+          <Link to="/register">
+            <Button variant="outline" size="sm" className="gap-2">
+              <PlusCircle className="w-4 h-4" />
+              Register Hospital
+            </Button>
+          </Link>
           <Link to="/map">
             <Button size="sm" className="gradient-hero text-primary-foreground border-0 gap-2">
               <Zap className="w-4 h-4" />
