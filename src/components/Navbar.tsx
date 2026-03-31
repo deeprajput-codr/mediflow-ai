@@ -1,16 +1,29 @@
 import { Link, useLocation } from "react-router-dom";
-import { Activity, MapPin, LayoutDashboard, LogIn, Zap, PlusCircle } from "lucide-react";
+import { Activity, MapPin, LayoutDashboard, LogIn, Zap, PlusCircle, Building } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const Navbar = () => {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(() => localStorage.getItem("hospitalLoggedIn") === "true");
+
+  useEffect(() => {
+    const handleAuthChange = () => {
+      setIsLoggedIn(localStorage.getItem("hospitalLoggedIn") === "true");
+    };
+    window.addEventListener("storage", handleAuthChange);
+    window.addEventListener("hospitalAuthChange", handleAuthChange);
+    return () => {
+      window.removeEventListener("storage", handleAuthChange);
+      window.removeEventListener("hospitalAuthChange", handleAuthChange);
+    };
+  }, []);
 
   const links = [
     { to: "/", label: "Home", icon: Activity },
     { to: "/map", label: "Find Hospitals", icon: MapPin },
-    { to: "/admin", label: "Admin", icon: LayoutDashboard },
+    { to: "/admin", label: isLoggedIn ? "Update Info" : "Admin", icon: LayoutDashboard },
   ];
 
   return (
@@ -48,24 +61,27 @@ const Navbar = () => {
         </div>
 
         <div className="hidden md:flex items-center gap-3">
-          <Link to="/register">
-            <Button variant="outline" size="sm" className="gap-2">
-              <PlusCircle className="w-4 h-4" />
-              Register Hospital
-            </Button>
-          </Link>
           <Link to="/map">
             <Button size="sm" className="gradient-hero text-primary-foreground border-0 gap-2">
               <Zap className="w-4 h-4" />
               Find Fastest Hospital
             </Button>
           </Link>
-          <Link to="/admin">
-            <Button variant="outline" size="sm" className="gap-2">
-              <LogIn className="w-4 h-4" />
-              Hospital Login
-            </Button>
-          </Link>
+          {isLoggedIn ? (
+            <Link to="/admin">
+              <Button variant="outline" size="sm" className="gap-2">
+                <Building className="w-4 h-4" />
+                Your Hospital
+              </Button>
+            </Link>
+          ) : (
+            <Link to="/admin">
+              <Button variant="outline" size="sm" className="gap-2">
+                <LogIn className="w-4 h-4" />
+                Hospital Login
+              </Button>
+            </Link>
+          )}
         </div>
 
         {/* Mobile toggle */}
@@ -98,18 +114,27 @@ const Navbar = () => {
               </Link>
             );
           })}
-          <Link to="/register" onClick={() => setMobileOpen(false)}>
-            <Button variant="outline" size="sm" className="w-full mt-2 gap-2">
-              <PlusCircle className="w-4 h-4" />
-              Register Hospital
-            </Button>
-          </Link>
           <Link to="/map" onClick={() => setMobileOpen(false)}>
             <Button size="sm" className="w-full mt-2 gradient-hero text-primary-foreground border-0 gap-2">
               <Zap className="w-4 h-4" />
               Find Fastest Hospital
             </Button>
           </Link>
+          {isLoggedIn ? (
+            <Link to="/admin" onClick={() => setMobileOpen(false)}>
+              <Button variant="outline" size="sm" className="w-full mt-2 gap-2">
+                <Building className="w-4 h-4" />
+                Your Hospital
+              </Button>
+            </Link>
+          ) : (
+            <Link to="/admin" onClick={() => setMobileOpen(false)}>
+              <Button variant="outline" size="sm" className="w-full mt-2 gap-2">
+                <LogIn className="w-4 h-4" />
+                Hospital Login
+              </Button>
+            </Link>
+          )}
         </div>
       )}
     </nav>

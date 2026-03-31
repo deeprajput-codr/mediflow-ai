@@ -1,18 +1,53 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, Filter, Zap } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import HospitalMap from "@/components/HospitalMap";
 import HospitalCard from "@/components/HospitalCard";
-import { hospitals } from "@/data/hospitals";
+import { Hospital } from "@/data/hospitals";
+import { supabase } from "@/lib/supabase";
 
 const filters = ["All", "General", "Emergency", "Specialty"];
 
 const MapDashboard = () => {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("All");
+  const [dbHospitals, setDbHospitals] = useState<Hospital[]>([]);
 
-  const filtered = hospitals.filter((h) => {
+  useEffect(() => {
+    const fetchHospitals = async () => {
+      const { data, error } = await supabase.from("hospitals").select("*");
+      if (data) {
+        const mapped: Hospital[] = data.map((dbH) => {
+          const rt = dbH.realtime_data || {};
+          return {
+            id: dbH.id,
+            name: dbH.hospital_name,
+            address: dbH.address,
+            phone: dbH.phone,
+            lat: 28.6139, // placeholder for map api
+            lng: 77.2090, // placeholder for map api
+            type: rt.hospitalType || "General",
+            rating: 4.5,
+            isRegistered: true,
+            crowdLevel: rt.queueLength > 20 ? "High" : rt.queueLength > 10 ? "Medium" : "Low",
+            waitingTime: rt.queueLength ? Number(rt.queueLength) * 3 : 15,
+            patientCount: Number(rt.patientCount) || 0,
+            availableBeds: Number(rt.availableBeds) || 0,
+            totalBeds: rt.totalBeds ? Number(rt.totalBeds) : (Number(rt.availableBeds || 0) + 10),
+            icuAvailable: Number(rt.icuAvailable) || 0,
+            otAvailable: Number(rt.otAvailable) || 0,
+            ambulanceCount: Number(rt.ambulanceCount) || 0,
+            queueLength: Number(rt.queueLength) || 0,
+          };
+        });
+        setDbHospitals(mapped);
+      }
+    };
+    fetchHospitals();
+  }, []);
+
+  const filtered = dbHospitals.filter((h) => {
     const matchSearch = h.name.toLowerCase().includes(search.toLowerCase()) ||
       h.address.toLowerCase().includes(search.toLowerCase());
     const matchType = typeFilter === "All" || h.type === typeFilter;

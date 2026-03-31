@@ -1,13 +1,54 @@
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Clock, Users, BedDouble, Ambulance, Star, Phone, MapPin, Brain, Award, Siren, Activity } from "lucide-react";
+import { ArrowLeft, Clock, Users, BedDouble, Ambulance, Phone, MapPin, Brain, Siren, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { hospitals } from "@/data/hospitals";
 import CrowdBadge from "@/components/CrowdBadge";
 import { Progress } from "@/components/ui/progress";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import type { Hospital } from "@/data/hospitals";
 
 const HospitalDetail = () => {
   const { id } = useParams();
-  const hospital = hospitals.find((h) => h.id === id);
+  const [hospital, setHospital] = useState<Hospital | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchHospital = async () => {
+      if (!id) return;
+      setLoading(true);
+      const { data, error } = await supabase.from("hospitals").select("*").eq("id", id).single();
+      if (data) {
+        const rt = data.realtime_data || {};
+        setHospital({
+          id: data.id,
+          name: data.hospital_name,
+          address: data.address,
+          phone: data.phone,
+          lat: 28.6139,
+          lng: 77.2090,
+          rating: 4.5,
+          isRegistered: true,
+          crowdLevel: rt.queueLength > 20 ? "High" : rt.queueLength > 10 ? "Medium" : "Low",
+          waitingTime: rt.queueLength ? Number(rt.queueLength) * 3 : 15,
+          patientCount: Number(rt.patientCount) || 0,
+          availableBeds: Number(rt.availableBeds) || 0,
+          totalBeds: rt.totalBeds ? Number(rt.totalBeds) : (Number(rt.availableBeds || 0) + 10),
+          icuAvailable: Number(rt.icuAvailable) || 0,
+          otAvailable: Number(rt.otAvailable) || 0,
+          ambulanceCount: Number(rt.ambulanceCount) || 0,
+          queueLength: Number(rt.queueLength) || 0,
+          emergencyActive: rt.emergencyActive !== false,
+          type: rt.hospitalType || "General",
+        });
+      }
+      setLoading(false);
+    };
+    fetchHospital();
+  }, [id]);
+
+  if (loading) {
+    return <div className="min-h-screen pt-16 flex items-center justify-center text-muted-foreground">Loading hospital details...</div>;
+  }
 
   if (!hospital) {
     return (
@@ -34,12 +75,7 @@ const HospitalDetail = () => {
 
         {/* Header */}
         <div className="bg-card rounded-xl border border-border shadow-card overflow-hidden mb-6">
-          {hospital.aiRecommended && (
-            <div className="gradient-accent px-6 py-2 flex items-center gap-2 text-accent-foreground text-sm font-semibold">
-              <Award className="w-4 h-4" />
-              Best Choice Right Now — AI Recommended
-            </div>
-          )}
+
           <div className="p-6">
             <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
               <div>
@@ -53,9 +89,7 @@ const HospitalDetail = () => {
               </div>
               <div className="flex items-center gap-3">
                 <CrowdBadge level={hospital.crowdLevel} size="lg" />
-                <div className="flex items-center gap-1 text-sm bg-warning/10 text-warning px-3 py-1.5 rounded-full font-medium">
-                  <Star className="w-4 h-4 fill-warning" /> {hospital.rating}
-                </div>
+
               </div>
             </div>
           </div>
@@ -122,7 +156,9 @@ const HospitalDetail = () => {
                 <span className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Siren className="w-4 h-4 text-danger" /> Emergency
                 </span>
-                <span className="font-bold text-success">Active</span>
+                <span className={`font-bold ${hospital.emergencyActive ? "text-success" : "text-muted-foreground"}`}>
+                  {hospital.emergencyActive ? "Active" : "Inactive"}
+                </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Hospital Type</span>

@@ -9,12 +9,7 @@ const HospitalCard = ({ hospital }: { hospital: Hospital }) => {
       to={`/hospital/${hospital.id}`}
       className="block bg-card rounded-xl border border-border shadow-card hover:shadow-elevated transition-all duration-300 hover:-translate-y-1 overflow-hidden group"
     >
-      {hospital.aiRecommended && (
-        <div className="gradient-accent px-4 py-1.5 flex items-center gap-2 text-accent-foreground text-xs font-semibold">
-          <Award className="w-3.5 h-3.5" />
-          Recommended Hospital for You
-        </div>
-      )}
+
 
       <div className="p-5">
         <div className="flex items-start justify-between mb-3">
@@ -47,10 +42,7 @@ const HospitalCard = ({ hospital }: { hospital: Hospital }) => {
         </div>
 
         <div className="flex items-center justify-between mt-4 pt-3 border-t border-border">
-          <div className="flex items-center gap-1 text-sm">
-            <Star className="w-4 h-4 text-warning fill-warning" />
-            <span className="font-semibold text-foreground">{hospital.rating}</span>
-          </div>
+          <div></div>
           <span className="text-xs font-medium px-2 py-1 rounded-md bg-primary/10 text-primary">
             {hospital.type}
           </span>
