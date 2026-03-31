@@ -8,6 +8,7 @@ import Home from "./pages/Home";
 import MapDashboard from "./pages/MapDashboard";
 import HospitalDetail from "./pages/HospitalDetail";
 import AdminDashboard from "./pages/AdminDashboard";
+import RegisterHospital from "./pages/RegisterHospital";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
