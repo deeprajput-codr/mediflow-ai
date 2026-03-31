@@ -25,6 +25,7 @@ const App = () => (
           <Route path="/map" element={<MapDashboard />} />
           <Route path="/hospital/:id" element={<HospitalDetail />} />
           <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/register" element={<RegisterHospital />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

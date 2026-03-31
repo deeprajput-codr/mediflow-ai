@@ -98,6 +98,12 @@ const Navbar = () => {
               </Link>
             );
           })}
+          <Link to="/register" onClick={() => setMobileOpen(false)}>
+            <Button variant="outline" size="sm" className="w-full mt-2 gap-2">
+              <PlusCircle className="w-4 h-4" />
+              Register Hospital
+            </Button>
+          </Link>
           <Link to="/map" onClick={() => setMobileOpen(false)}>
             <Button size="sm" className="w-full mt-2 gradient-hero text-primary-foreground border-0 gap-2">
               <Zap className="w-4 h-4" />
