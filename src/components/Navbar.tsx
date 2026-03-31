@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Activity, MapPin, LayoutDashboard, LogIn, Zap } from "lucide-react";
+import { Activity, MapPin, LayoutDashboard, LogIn, Zap, PlusCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 
