@@ -8,7 +8,6 @@ import Home from "./pages/Home";
 import MapDashboard from "./pages/MapDashboard";
 import HospitalDetail from "./pages/HospitalDetail";
 import AdminDashboard from "./pages/AdminDashboard";
-import RegisterHospital from "./pages/RegisterHospital";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -25,7 +24,6 @@ const App = () => (
           <Route path="/map" element={<MapDashboard />} />
           <Route path="/hospital/:id" element={<HospitalDetail />} />
           <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="/register" element={<RegisterHospital />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

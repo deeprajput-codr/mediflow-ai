@@ -163,6 +163,29 @@ const AdminDashboard = () => {
             try { imageUrl = await processImage(hospitalImage); } 
             catch(e) { console.error("Image processing error", e); }
           }
+          
+          let finalLat = lat;
+          let finalLng = lng;
+          if (!finalLat || !finalLng) {
+            try {
+              toast.info("Pinpointing address on map...");
+              const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`, {
+                headers: { 'Accept-Language': 'en' }
+              });
+              if (res.ok) {
+                const data = await res.json();
+                if (data && data.length > 0) {
+                  finalLat = parseFloat(data[0].lat);
+                  finalLng = parseFloat(data[0].lon);
+                  toast.success("Address successfully plotted!");
+                } else {
+                  toast.warning("Could not definitively isolate address coordinates. Using fallback.");
+                }
+              } else {
+                console.warn("Geocoding rate limit/error", res.status);
+              }
+            } catch(e) { console.error("Geocoding fallback error", e); }
+          }
 
           const salt = bcrypt.genSaltSync(10);
           const password_hash = bcrypt.hashSync(password, salt);
@@ -189,8 +212,8 @@ const AdminDashboard = () => {
                 totalBeds,
                 emergencyActive,
                 imageUrl,
-                lat,
-                lng
+                lat: finalLat,
+                lng: finalLng
               }
             }]);
 
@@ -281,9 +304,32 @@ const AdminDashboard = () => {
       }
 
       // First fetch existing data to prevent overwriting existing image if none is uploaded
-      const { data: existingData } = await supabase.from('hospitals').select('realtime_data').eq('email', hospitalEmail).single();
+      const { data: existingData } = await supabase.from('hospitals').select('address, realtime_data').eq('email', hospitalEmail).single();
       const existingRt = existingData?.realtime_data || {};
+      const existingAddress = existingData?.address || "";
       
+      let finalLat = lat || existingRt.lat;
+      let finalLng = lng || existingRt.lng;
+
+      if (!lat && !lng && address !== existingAddress) {
+        try {
+          toast.info("Updating map coordinates...");
+          const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`, {
+             headers: { 'Accept-Language': 'en' }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.length > 0) {
+              finalLat = parseFloat(data[0].lat);
+              finalLng = parseFloat(data[0].lon);
+              toast.success("Map location updated!");
+            } else {
+              toast.warning("Could not definitively isolate new address coordinates.");
+            }
+          }
+        } catch(e) { console.error("Geocoding fallback error", e); }
+      }
+
       const { error } = await supabase
         .from('hospitals')
         .update({
@@ -304,8 +350,8 @@ const AdminDashboard = () => {
             speciality,
             emergencyActive,
             ...(newImageUrl ? { imageUrl: newImageUrl } : {}),
-            lat: lat || existingRt.lat,
-            lng: lng || existingRt.lng
+            lat: finalLat,
+            lng: finalLng
           }
         })
         .eq('email', hospitalEmail);
