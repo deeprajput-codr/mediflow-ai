@@ -7,6 +7,29 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
+const processImage = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (e) => {
+      const img = new Image();
+      img.src = e.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const MAX_WIDTH = 600;
+        const scaleSize = MAX_WIDTH / img.width;
+        canvas.width = MAX_WIDTH;
+        canvas.height = img.height * scaleSize;
+        const ctx = canvas.getContext("2d");
+        ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/webp", 0.7));
+      };
+      img.onerror = (error) => reject(error);
+    };
+    reader.onerror = (error) => reject(error);
+  });
+};
+
 const AdminDashboard = () => {
   const [loggedIn, setLoggedIn] = useState(() => localStorage.getItem("hospitalLoggedIn") === "true");
   const [hospitalEmail, setHospitalEmail] = useState(() => localStorage.getItem("hospitalEmail") || "");
@@ -21,6 +44,8 @@ const AdminDashboard = () => {
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [hospitalImage, setHospitalImage] = useState<File | null>(null);
+  const [lat, setLat] = useState<number | null>(null);
+  const [lng, setLng] = useState<number | null>(null);
 
   const [patientCount, setPatientCount] = useState("45");
   const [queueLength, setQueueLength] = useState("8");
@@ -32,6 +57,8 @@ const AdminDashboard = () => {
   const [totalBeds, setTotalBeds] = useState("100");
   const [hospitalType, setHospitalType] = useState("General");
   const [emergencyActive, setEmergencyActive] = useState(true);
+  const [description, setDescription] = useState("");
+  const [speciality, setSpeciality] = useState("");
 
   useEffect(() => {
     if (loggedIn && hospitalEmail) {
@@ -61,6 +88,9 @@ const AdminDashboard = () => {
             if (rt.ambulanceCount) setAmbulanceCount(rt.ambulanceCount);
             if (rt.totalBeds) setTotalBeds(rt.totalBeds);
             if (rt.hospitalType) setHospitalType(rt.hospitalType);
+            if (rt.speciality) setSpeciality(rt.speciality);
+            if (rt.lat) setLat(rt.lat);
+            if (rt.lng) setLng(rt.lng);
             if (rt.emergencyActive !== undefined) setEmergencyActive(rt.emergencyActive);
           }
         }
@@ -79,11 +109,61 @@ const AdminDashboard = () => {
     window.dispatchEvent(new Event("hospitalAuthChange"));
   };
 
+  const handleLiveLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error("Geolocation is not supported by your browser.");
+      return;
+    }
+
+    toast.info("Fetching your location...");
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          setLat(latitude);
+          setLng(longitude);
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+          const data = await res.json();
+          if (data && data.display_name) {
+            setAddress(data.display_name);
+            toast.success("Location retrieved successfully!");
+          } else {
+            toast.error("Failed to parse location data.");
+          }
+        } catch (error) {
+          toast.error("Error fetching location details.");
+        }
+      },
+      (error) => {
+        toast.error("Location access denied or unavailable.");
+      }
+    );
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isRegistering) {
       if (email && password && hospitalName && registrationNumber && phone && address) {
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          toast.error("Please enter a valid email address.");
+          return;
+        }
+        if (password.length < 6) {
+          toast.error("Password must be at least 6 characters long.");
+          return;
+        }
+        if (!/^\+?[\d\s-]{10,}$/.test(phone)) {
+          toast.error("Please enter a valid phone number.");
+          return;
+        }
         try {
+          let imageUrl = null;
+          if (hospitalImage) {
+            try { imageUrl = await processImage(hospitalImage); } 
+            catch(e) { console.error("Image processing error", e); }
+          }
+
           const salt = bcrypt.genSaltSync(10);
           const password_hash = bcrypt.hashSync(password, salt);
 
@@ -95,7 +175,23 @@ const AdminDashboard = () => {
               phone,
               address,
               email,
-              password_hash
+              password_hash,
+              realtime_data: {
+                description,
+                hospitalType,
+                speciality,
+                patientCount,
+                queueLength,
+                availableBeds,
+                icuAvailable,
+                otAvailable,
+                ambulanceCount,
+                totalBeds,
+                emergencyActive,
+                imageUrl,
+                lat,
+                lng
+              }
             }]);
 
           if (error) throw error;
@@ -110,6 +206,10 @@ const AdminDashboard = () => {
       }
     } else {
       if (email && password) {
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          toast.error("Please enter a valid email address.");
+          return;
+        }
         try {
           const { data, error } = await supabase
             .from('hospitals')
@@ -142,10 +242,14 @@ const AdminDashboard = () => {
     try {
       if (!hospitalEmail) throw new Error("No hospital email identified.");
       
+      const { data: existingData } = await supabase.from('hospitals').select('realtime_data').eq('email', hospitalEmail).single();
+      const existingRt = existingData?.realtime_data || {};
+
       const { error } = await supabase
         .from('hospitals')
         .update({
           realtime_data: {
+            ...existingRt,
             patientCount,
             queueLength,
             availableBeds,
@@ -169,6 +273,17 @@ const AdminDashboard = () => {
   const handleProfileSave = async () => {
     try {
       if (!hospitalEmail) throw new Error("No hospital email identified.");
+      
+      let newImageUrl = undefined;
+      if (hospitalImage) {
+        try { newImageUrl = await processImage(hospitalImage); }
+        catch(e) { console.error("Image processing error", e); }
+      }
+
+      // First fetch existing data to prevent overwriting existing image if none is uploaded
+      const { data: existingData } = await supabase.from('hospitals').select('realtime_data').eq('email', hospitalEmail).single();
+      const existingRt = existingData?.realtime_data || {};
+      
       const { error } = await supabase
         .from('hospitals')
         .update({
@@ -177,6 +292,7 @@ const AdminDashboard = () => {
           phone,
           address,
           realtime_data: {
+            ...existingRt,
             patientCount,
             queueLength,
             availableBeds,
@@ -185,7 +301,11 @@ const AdminDashboard = () => {
             ambulanceCount,
             totalBeds,
             hospitalType,
-            emergencyActive
+            speciality,
+            emergencyActive,
+            ...(newImageUrl ? { imageUrl: newImageUrl } : {}),
+            lat: lat || existingRt.lat,
+            lng: lng || existingRt.lng
           }
         })
         .eq('email', hospitalEmail);
@@ -266,7 +386,12 @@ const AdminDashboard = () => {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="address">Full Address</Label>
+                    <div className="flex justify-between items-center mb-1">
+                      <Label htmlFor="address" className="mb-0">Full Address</Label>
+                      <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs text-primary" onClick={handleLiveLocation}>
+                        <MapPin className="w-3 h-3 mr-1" /> Get Live Location
+                      </Button>
+                    </div>
                     <div className="relative">
                       <MapPin className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                       <Input
@@ -276,6 +401,42 @@ const AdminDashboard = () => {
                         className="pl-9"
                         value={address}
                         onChange={(e) => setAddress(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="type_spec">Hospital Type & Speciality</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <select 
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                        value={hospitalType} 
+                        onChange={e => setHospitalType(e.target.value)}
+                      >
+                        <option value="General">General</option>
+                        <option value="Specialty">Specialty</option>
+                        <option value="Superspecialist">Superspecialist</option>
+                        <option value="Multispecialist">Multispecialist</option>
+                      </select>
+                      <Input
+                        placeholder="e.g. Cardiology"
+                        value={speciality}
+                        onChange={(e) => setSpeciality(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="description">Short Description</Label>
+                    <div className="relative">
+                      <FileText className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="description"
+                        type="text"
+                        placeholder="Brief overview of the hospital"
+                        className="pl-9"
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
                       />
                     </div>
                   </div>
@@ -418,21 +579,41 @@ const AdminDashboard = () => {
                 <Input value={address} onChange={e => setAddress(e.target.value)} />
               </div>
               <div className="sm:col-span-2">
-              <div>
-                <Label className="mb-2 block">Hospital Type</Label>
-                <select 
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
-                  value={hospitalType} 
-                  onChange={e => setHospitalType(e.target.value)}
-                >
-                  <option value="General">General</option>
-                  <option value="Emergency">Emergency</option>
-                  <option value="Specialty">Specialty</option>
-                </select>
+              <div className="space-y-2">
+                <Label className="mb-2 block">Hospital & Speciality Types</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <select 
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                    value={hospitalType} 
+                    onChange={e => setHospitalType(e.target.value)}
+                  >
+                    <option value="General">General</option>
+                    <option value="Specialty">Specialty</option>
+                    <option value="Superspecialist">Superspecialist</option>
+                    <option value="Multispecialist">Multispecialist</option>
+                  </select>
+                  <Input
+                    placeholder="e.g. Cardiology"
+                    value={speciality}
+                    onChange={(e) => setSpeciality(e.target.value)}
+                  />
+                </div>
               </div>
               <div className="mt-4">
                 <Label className="mb-2 block">Total Beds capacity</Label>
                 <Input type="number" value={totalBeds} onChange={e => setTotalBeds(e.target.value)} />
+              </div>
+              <div className="sm:col-span-2">
+                <Label className="mb-2 block">Hospital Image</Label>
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      setHospitalImage(e.target.files[0]);
+                    }
+                  }}
+                />
               </div>
               <div className="sm:col-span-2 mt-2">
                 <Label className="flex items-center gap-2 cursor-pointer">

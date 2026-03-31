@@ -1,4 +1,4 @@
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useLocation } from "react-router-dom";
 import { ArrowLeft, Clock, Users, BedDouble, Ambulance, Phone, MapPin, Brain, Siren, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import CrowdBadge from "@/components/CrowdBadge";
@@ -9,11 +9,23 @@ import type { Hospital } from "@/data/hospitals";
 
 const HospitalDetail = () => {
   const { id } = useParams();
+  const location = useLocation();
   const [hospital, setHospital] = useState<Hospital | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchHospital = async () => {
+      // Prioritize data from route state if arriving explicitly from MapDashboard
+      if (location.state?.hospitalData) {
+        const hData = location.state.hospitalData;
+        setHospital(hData);
+        // If it's an OpenStreetMap result, do NOT query Supabase DB at all
+        if (!hData.isRegistered) {
+          setLoading(false);
+          return;
+        }
+      }
+
       if (!id) return;
       setLoading(true);
       const { data, error } = await supabase.from("hospitals").select("*").eq("id", id).single();
@@ -39,6 +51,8 @@ const HospitalDetail = () => {
           queueLength: Number(rt.queueLength) || 0,
           emergencyActive: rt.emergencyActive !== false,
           type: rt.hospitalType || "General",
+          speciality: rt.speciality || "",
+          imageUrl: rt.imageUrl || "",
         });
       }
       setLoading(false);
@@ -75,7 +89,11 @@ const HospitalDetail = () => {
 
         {/* Header */}
         <div className="bg-card rounded-xl border border-border shadow-card overflow-hidden mb-6">
-
+          {hospital.imageUrl && (
+            <div className="w-full h-48 md:h-64 overflow-hidden bg-muted">
+              <img src={hospital.imageUrl} alt={hospital.name} className="w-full h-full object-cover" />
+            </div>
+          )}
           <div className="p-6">
             <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
               <div>
@@ -163,7 +181,7 @@ const HospitalDetail = () => {
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Hospital Type</span>
                 <span className="text-sm font-medium px-2 py-1 rounded-md bg-primary/10 text-primary">
-                  {hospital.type}
+                  {hospital.type}{hospital.speciality ? ` • ${hospital.speciality}` : ""}
                 </span>
               </div>
             </div>

@@ -21,6 +21,8 @@ export interface Hospital {
   isRegistered: boolean;
   aiRecommended?: boolean;
   emergencyActive?: boolean;
+  speciality?: string;
+  imageUrl?: string;
 }
 
 export const hospitals: Hospital[] = [];
