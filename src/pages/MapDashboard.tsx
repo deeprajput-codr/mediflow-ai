@@ -219,7 +219,10 @@ const MapDashboard = () => {
       return;
     }
 
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY?.trim();
+    // HARDCODED API KEY FOR LIVE HACKATHON PRESENTATION.
+    // This forcibly bypasses the missing Netlify environment variables that caused the crash!
+    const apiKey = "AIzaSyD8YaH6HNJAGUDcQZIdRf0CfoHQEWw1hBE";
+    
     if (!apiKey) {
       toast.error("AI API Key missing! Please add it to your .env file.");
       return;
