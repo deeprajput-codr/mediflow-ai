@@ -80,8 +80,23 @@ const MapDashboard = () => {
             node(around:10000,${latitude},${longitude})[amenity=hospital];
             out;
           `;
-          const res = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
-          const data = await res.json();
+          let data = null;
+          const endpoints = [
+            'https://overpass-api.de/api/interpreter',
+            'https://maps.mail.ru/osm/tools/overpass/api/interpreter'
+          ];
+          
+          for (const ep of endpoints) {
+            try {
+              const res = await fetch(`${ep}?data=${encodeURIComponent(query)}`);
+              if (res.ok) {
+                data = await res.json();
+                break;
+              }
+            } catch (err) {
+              console.warn(`OSM endpoint ${ep} failed, trying next...`);
+            }
+          }
           
           if (data && data.elements) {
             const mappedOsm: Hospital[] = data.elements.map((el: any) => ({
@@ -196,7 +211,7 @@ const MapDashboard = () => {
       return;
     }
 
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY?.trim();
     if (!apiKey) {
       toast.error("AI API Key missing! Please add it to your .env file.");
       return;
