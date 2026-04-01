@@ -23,12 +23,17 @@ const HospitalMap = ({ selectedFilter, hospitalsData, userLocation }: HospitalMa
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
   const navigate = useNavigate();
 
-  // Whenever userLocation changes or on mount, we can center the map
+  // Whenever hospitals data changes, physically adapt the map bounds so the user is never staring at empty land
   useEffect(() => {
-    if (mapRef.current && userLocation) {
-      mapRef.current.setView([userLocation.lat, userLocation.lng], 12);
+    if (mapRef.current && hospitalsData.length > 0) {
+      const bounds = L.latLngBounds(hospitalsData.map(h => [h.lat, h.lng]));
+      if (bounds.isValid()) {
+        mapRef.current.flyToBounds(bounds, { padding: [50, 50], maxZoom: 14, animate: true, duration: 1 });
+      }
+    } else if (mapRef.current && userLocation) {
+      mapRef.current.flyTo([userLocation.lat, userLocation.lng], 12);
     }
-  }, [userLocation]);
+  }, [hospitalsData, userLocation]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -107,7 +112,6 @@ const HospitalMap = ({ selectedFilter, hospitalsData, userLocation }: HospitalMa
       `);
     });
 
-    return () => {};
   }, [hospitalsData]);
 
   // Cleanup on unmount

@@ -67,70 +67,78 @@ const MapDashboard = () => {
       )
       .subscribe();
 
+    const fetchOSM = async (latitude: number, longitude: number) => {
+      try {
+        const query = `
+          [out:json];
+          node(around:10000,${latitude},${longitude})[amenity=hospital];
+          out;
+        `;
+        let data = null;
+        const endpoints = [
+          'https://overpass-api.de/api/interpreter',
+          'https://maps.mail.ru/osm/tools/overpass/api/interpreter'
+        ];
+        
+        for (const ep of endpoints) {
+          try {
+            const res = await fetch(`${ep}?data=${encodeURIComponent(query)}`);
+            if (res.ok) {
+              data = await res.json();
+              break;
+            }
+          } catch (err) {
+            console.warn(`OSM endpoint ${ep} failed, trying next...`);
+          }
+        }
+        
+        if (data && data.elements) {
+          const mappedOsm: Hospital[] = data.elements.map((el: any) => ({
+            id: `osm_${el.id}`,
+            name: el.tags?.name || "Unknown Hospital",
+            address: "OpenStreetMap Data",
+            phone: el.tags?.phone || "N/A",
+            lat: el.lat,
+            lng: el.lon,
+            type: "General",
+            speciality: "",
+            imageUrl: "",
+            rating: 0,
+            isRegistered: false,
+            crowdLevel: "Low",
+            waitingTime: 0,
+            patientCount: 0,
+            availableBeds: 0,
+            totalBeds: 0,
+            icuAvailable: 0,
+            otAvailable: 0,
+            ambulanceCount: 0,
+            queueLength: 0,
+            emergencyActive: false
+          }));
+          setOsmHospitals(mappedOsm);
+        }
+      } catch (error) {
+        console.error("Failed to fetch OSM hospitals", error);
+      }
+    };
+
     // Fetch user location
     if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(async (position) => {
-        const { latitude, longitude } = position.coords;
-        setUserLocation({ lat: latitude, lng: longitude });
-
-        // Fetch unregistered hospitals around user from OpenStreetMap Overpass (approx 10km radius)
-        try {
-          const query = `
-            [out:json];
-            node(around:10000,${latitude},${longitude})[amenity=hospital];
-            out;
-          `;
-          let data = null;
-          const endpoints = [
-            'https://overpass-api.de/api/interpreter',
-            'https://maps.mail.ru/osm/tools/overpass/api/interpreter'
-          ];
-          
-          for (const ep of endpoints) {
-            try {
-              const res = await fetch(`${ep}?data=${encodeURIComponent(query)}`);
-              if (res.ok) {
-                data = await res.json();
-                break;
-              }
-            } catch (err) {
-              console.warn(`OSM endpoint ${ep} failed, trying next...`);
-            }
-          }
-          
-          if (data && data.elements) {
-            const mappedOsm: Hospital[] = data.elements.map((el: any) => ({
-              id: `osm_${el.id}`,
-              name: el.tags?.name || "Unknown Hospital",
-              address: "OpenStreetMap Data",
-              phone: el.tags?.phone || "N/A",
-              lat: el.lat,
-              lng: el.lon,
-              type: "General",
-              speciality: "",
-              imageUrl: "",
-              rating: 0,
-              isRegistered: false,
-              crowdLevel: "Low",
-              waitingTime: 0,
-              patientCount: 0,
-              availableBeds: 0,
-              totalBeds: 0,
-              icuAvailable: 0,
-              otAvailable: 0,
-              ambulanceCount: 0,
-              queueLength: 0,
-              emergencyActive: false
-            }));
-            
-            setOsmHospitals(mappedOsm);
-          }
-        } catch (error) {
-          console.error("Failed to fetch OSM hospitals", error);
-        }
-      }, (err) => {
-        console.warn("Geolocation denied or error:", err);
-      });
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          setUserLocation({ lat: latitude, lng: longitude });
+          fetchOSM(latitude, longitude);
+        }, 
+        (err) => {
+          console.warn("Geolocation denied, timeout, or error:", err);
+          fetchOSM(28.6139, 77.2090); // Default to New Delhi if user blocks GPS!
+        },
+        { timeout: 8000 }
+      );
+    } else {
+      fetchOSM(28.6139, 77.2090);
     }
 
     return () => {
